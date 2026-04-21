@@ -12,6 +12,20 @@
 # - blackjack_engine.py
 # - model.py
 # - out/best_model.pt
+# - out/meta.json# app.py
+# Streamlit MVP app for the Blackjack AI Coach
+#
+# This app connects:
+# - blackjack_engine.py for the recommendation
+# - optional nanoGPT model output for explanation text
+#
+# To run:
+#   streamlit run app.py
+#
+# Optional files used:
+# - blackjack_engine.py
+# - model.py
+# - out/best_model.pt
 # - out/meta.json
 
 import html
@@ -313,6 +327,28 @@ st.markdown(
         opacity: 0.88;
     }
 
+    .copy-block {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0.6rem 0 0.9rem 0;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(215, 169, 75, 0.35);
+        background: linear-gradient(135deg, rgba(18, 56, 42, 0.98), rgba(29, 107, 79, 0.96));
+        color: #fff8ef !important;
+        -webkit-text-fill-color: #fff8ef !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 0.86rem;
+        line-height: 1.55;
+        box-shadow: 0 10px 24px rgba(17, 63, 48, 0.18);
+    }
+
+    .copy-block * {
+        color: #fff8ef !important;
+        -webkit-text-fill-color: #fff8ef !important;
+    }
+
     div[data-testid="metric-container"] {
         background: rgba(255, 252, 247, 0.86);
         border: 1px solid var(--line);
@@ -378,13 +414,21 @@ st.markdown(
     [data-testid="stCodeBlock"],
     [data-testid="stCodeBlock"] pre,
     [data-testid="stCodeBlock"] code,
+    [data-testid="stCodeBlock"] pre > div,
+    [data-testid="stCodeBlock"] pre div,
+    [data-testid="stCodeBlock"] code > span,
     [data-testid="stJson"],
     [data-testid="stJson"] pre,
     [data-testid="stJson"] code,
+    [data-testid="stJson"] pre > div,
+    [data-testid="stJson"] pre div,
     .stCodeBlock,
     .stCodeBlock pre,
-    .stCodeBlock code {
+    .stCodeBlock code,
+    .stCodeBlock pre > div,
+    .stCodeBlock pre div {
         background: linear-gradient(135deg, rgba(18, 56, 42, 0.98), rgba(29, 107, 79, 0.96)) !important;
+        background-color: rgba(18, 56, 42, 0.98) !important;
         color: #fff8ef !important;
         border-color: rgba(215, 169, 75, 0.35) !important;
     }
@@ -468,10 +512,16 @@ st.markdown(
     [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"],
     [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"] pre,
     [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"] code,
+    [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"] pre > div,
+    [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"] pre div,
+    [data-testid="stExpanderDetails"] [data-testid="stCodeBlock"] code > span,
     [data-testid="stExpanderDetails"] [data-testid="stJson"],
     [data-testid="stExpanderDetails"] [data-testid="stJson"] pre,
-    [data-testid="stExpanderDetails"] [data-testid="stJson"] code {
-        background: rgba(8, 18, 28, 0.70) !important;
+    [data-testid="stExpanderDetails"] [data-testid="stJson"] code,
+    [data-testid="stExpanderDetails"] [data-testid="stJson"] pre > div,
+    [data-testid="stExpanderDetails"] [data-testid="stJson"] pre div {
+        background: linear-gradient(135deg, rgba(18, 56, 42, 0.98), rgba(29, 107, 79, 0.96)) !important;
+        background-color: rgba(18, 56, 42, 0.98) !important;
     }
 
     .stRadio > div {
@@ -521,6 +571,40 @@ PLAN_TIERS = {
     },
 }
 
+COACH_MODES = {
+    "Table Coach": "beginner",
+    "EV Edge": "math",
+    "Bankroll Desk": "math",
+}
+
+PLAN_TO_MODE = {
+    "Table Coach - Free": "Table Coach",
+    "EV Edge - $19 / month": "EV Edge",
+    "Bankroll Desk - $39 / month": "Bankroll Desk",
+}
+
+MODE_TO_PLAN = {mode: plan for plan, mode in PLAN_TO_MODE.items()}
+
+if (
+    "membership_tier" not in st.session_state
+    or st.session_state.membership_tier not in PLAN_TIERS
+):
+    st.session_state.membership_tier = "Table Coach - Free"
+
+if (
+    "coach_mode" not in st.session_state
+    or st.session_state.coach_mode not in COACH_MODES
+):
+    st.session_state.coach_mode = PLAN_TO_MODE[st.session_state.membership_tier]
+
+
+def sync_coach_mode_from_plan():
+    st.session_state.coach_mode = PLAN_TO_MODE[st.session_state.membership_tier]
+
+
+def sync_plan_from_coach_mode():
+    st.session_state.membership_tier = MODE_TO_PLAN[st.session_state.coach_mode]
+
 
 def normalize_for_display(cards):
     return ",".join(cards)
@@ -531,12 +615,7 @@ def escape_text(text):
 
 
 def selected_coach_text(coach_payload, explanation_mode):
-    mode_to_key = {
-        "Quick": "quick",
-        "Beginner": "beginner",
-        "Math": "math",
-    }
-    return coach_payload.get(mode_to_key[explanation_mode], coach_payload.get("beginner", ""))
+    return coach_payload.get(COACH_MODES[explanation_mode], coach_payload.get("beginner", ""))
 
 
 def render_panel(kicker, title, copy, strong=False):
@@ -578,6 +657,17 @@ def render_tier_summary(tier):
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_copy_block(text):
+    st.markdown(
+        f"""<pre class="copy-block">{escape_text(text)}</pre>""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_json_block(payload):
+    render_copy_block(json.dumps(payload, indent=2))
 
 
 def bankroll_guidance(result, selected_tier):
@@ -723,9 +813,10 @@ can_split = st.sidebar.checkbox("Split allowed", value=True)
 dealer_hits_soft_17 = st.sidebar.checkbox("Dealer hits soft 17", value=False)
 explanation_mode = st.sidebar.radio(
     "Coach Mode",
-    ["Beginner", "Quick", "Math"],
-    index=0,
-    help="Choose how the coach explains the decision.",
+    list(COACH_MODES.keys()),
+    help="Choose the output style: classical coaching, EV reasoning, or bankroll-aware guidance.",
+    key="coach_mode",
+    on_change=sync_plan_from_coach_mode,
 )
 use_gpt = st.sidebar.checkbox("Use trained nanoGPT explanation if available", value=True)
 
@@ -749,8 +840,9 @@ with intro_col2:
     selected_plan = st.selectbox(
         "Membership Tier",
         list(PLAN_TIERS.keys()),
-        index=0,
         help="Choose the plan level this version would sell to customers.",
+        key="membership_tier",
+        on_change=sync_coach_mode_from_plan,
     )
     selected_tier = PLAN_TIERS[selected_plan]
     render_tier_summary(selected_tier)
@@ -792,8 +884,9 @@ with right_col:
         <div class="panel">
             <div class="section-kicker">Coach Modes</div>
             <div class="chips-row">
-                <span class="chip">Classical: English</span>
-                <span class="chip">Math: expected value</span>
+                <span class="chip">Table Coach: classical</span>
+                <span class="chip">EV Edge: expected value</span>
+                <span class="chip">Bankroll Desk: risk lens</span>
             </div>
         </div>
         """,
@@ -830,6 +923,8 @@ if analyze_button:
         coach_text = selected_coach_text(coach, explanation_mode)
         if selected_tier["level"] == "free":
             coach_text = explanation
+        elif explanation_mode == "Bankroll Desk":
+            coach_text = bankroll_guidance(result, selected_tier)
 
         hand_type_parts = []
         if result["hand_info"]["is_soft"]:
@@ -928,10 +1023,10 @@ if analyze_button:
                 )
             )
             with st.expander("Show EV comparison"):
-                st.code(ev_lines)
+                render_copy_block(ev_lines)
         elif action_evs:
             with st.expander("Upgrade preview"):
-                st.code("EV Edge unlocks action-by-action expected value comparisons.")
+                render_copy_block("EV Edge unlocks action-by-action expected value comparisons.")
 
         gpt_prompt = format_for_gpt(result)
 
@@ -957,16 +1052,16 @@ if analyze_button:
                 )
 
                 with st.expander("Show full nanoGPT output"):
-                    st.code(gpt_output)
+                    render_copy_block(gpt_output)
 
         if selected_tier["level"] in ["pro", "elite"]:
             with st.expander("Show EV engine prompt and raw output"):
                 st.markdown("**Structured Prompt Sent to GPT**")
-                st.code(gpt_prompt)
+                render_copy_block(gpt_prompt)
                 st.markdown("**Raw Engine Explanation**")
                 st.write(explanation)
                 st.markdown("**Raw Engine Output**")
-                st.json(result)
+                render_json_block(result)
 
     except Exception as e:
         st.error(f"Error: {e}")
@@ -987,9 +1082,11 @@ with footer_col1:
 
 with footer_col2:
     with st.expander("Example test hands"):
-        st.code(
+        render_copy_block(
             "Player: 8,8 | Dealer: 6\n"
             "Player: 10,6 | Dealer: 7\n"
             "Player: A,7 | Dealer: 9\n"
             "Player: 5,5 | Dealer: 6"
         )
+
+
