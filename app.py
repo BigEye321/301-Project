@@ -28,6 +28,22 @@
 # - out/best_model.pt
 # - out/meta.json
 
+# app.py
+# Streamlit MVP app for the Blackjack AI Coach
+#
+# This app connects:
+# - blackjack_engine.py for the recommendation
+# - optional nanoGPT model output for explanation text
+#
+# To run:
+#   streamlit run app.py
+#
+# Optional files used:
+# - blackjack_engine.py
+# - model.py
+# - out/best_model.pt
+# - out/meta.json
+
 import html
 import json
 from pathlib import Path
@@ -243,6 +259,7 @@ st.markdown(
         font-size: 1.12rem;
         line-height: 1.6;
         margin: 0;
+        white-space: pre-line;
     }
 
     .insight-card {
@@ -670,7 +687,7 @@ def render_json_block(payload):
     render_copy_block(json.dumps(payload, indent=2))
 
 
-def bankroll_guidance(result, selected_tier):
+def bankroll_context(result, selected_tier, bankroll_amount=None, bet_size=None):
     action = result["recommended_action"]
     best_ev = result.get("best_ev")
     ev_margin = result.get("ev_margin")
@@ -696,10 +713,133 @@ def bankroll_guidance(result, selected_tier):
         else "The model sees a narrow edge, so disciplined execution matters more than aggression."
     )
 
+    if not bankroll_amount or bankroll_amount <= 0 or not bet_size or bet_size <= 0:
+        return {
+            "action": action,
+            "best_ev": best_ev,
+            "ev_margin": ev_margin,
+            "pressure": pressure,
+            "margin_text": margin_text,
+            "has_bankroll_inputs": False,
+            "bankroll_amount": bankroll_amount,
+            "bet_size": bet_size,
+            "bet_fraction": None,
+            "stake_note": None,
+            "conservative_unit": None,
+            "assertive_unit": None,
+            "expected_profit_per_hand": None,
+            "expected_profit_per_100": None,
+            "long_run_note": "Add a bankroll amount and live bet size to unlock the full bankroll analysis.",
+        }
+
+    bet_fraction = bet_size / bankroll_amount
+    conservative_unit = bankroll_amount * 0.01
+    assertive_unit = bankroll_amount * 0.02
+    expected_profit_per_hand = best_ev * bet_size
+    expected_profit_per_100 = expected_profit_per_hand * 100
+
+    if bet_fraction > 0.03:
+        stake_note = "very aggressive for a training bankroll"
+    elif bet_fraction > 0.02:
+        stake_note = "on the aggressive side"
+    elif bet_fraction >= 0.01:
+        stake_note = "within a disciplined working range"
+    else:
+        stake_note = "conservative"
+
+    if best_ev > 0:
+        long_run_note = (
+            f"If you can repeatedly find spots with a positive edge and hold the same bankroll discipline, "
+            f"this stake size implies about ${expected_profit_per_hand:,.2f} of expectation per hand, or roughly "
+            f"${expected_profit_per_100:,.2f} per 100 similar hands. That is not a promise of short-term profit; "
+            "it is the long-run value of making mathematically sound decisions without overbetting."
+        )
+    else:
+        long_run_note = (
+            f"This hand is not a positive-expectation betting opportunity at the current model output, so the bankroll goal "
+            "is protection rather than growth. In negative or thin spots, long-run profit comes more from avoiding oversized bets "
+            "and preserving capital for stronger situations than from pressing action."
+        )
+
+    return {
+        "action": action,
+        "best_ev": best_ev,
+        "ev_margin": ev_margin,
+        "pressure": pressure,
+        "margin_text": margin_text,
+        "has_bankroll_inputs": True,
+        "bankroll_amount": bankroll_amount,
+        "bet_size": bet_size,
+        "bet_fraction": bet_fraction,
+        "stake_note": stake_note,
+        "conservative_unit": conservative_unit,
+        "assertive_unit": assertive_unit,
+        "expected_profit_per_hand": expected_profit_per_hand,
+        "expected_profit_per_100": expected_profit_per_100,
+        "long_run_note": long_run_note,
+    }
+
+
+def bankroll_coach_call(result, selected_tier, bankroll_amount=None, bet_size=None):
+    ctx = bankroll_context(result, selected_tier, bankroll_amount, bet_size)
+    if ctx is None:
+        return None
+
+    if not ctx["has_bankroll_inputs"]:
+        return (
+            f"{ctx['action']} is still the right move here, but Bankroll Desk gets much stronger once you enter bankroll and bet size. "
+            f"Right now the hand grades as a {ctx['pressure']} spot at {ctx['best_ev']:+.3f} units."
+        )
+
     return (
-        f"Bankroll lens: this is a {pressure} spot. The selected action is {action} at "
-        f"{best_ev:+.3f} units per original bet. {margin_text} Treat this as training guidance, "
-        "not a guarantee of a single-hand result."
+        f"{ctx['action']} is the bankroll-aware play here. At ${ctx['bet_size']:,.2f} on a ${ctx['bankroll_amount']:,.2f} bankroll, "
+        f"you are risking {ctx['bet_fraction'] * 100:.2f}% of bankroll, so the edge only pays off cleanly if the stake stays disciplined. "
+        f"This hand is worth {ctx['best_ev']:+.3f} units per original bet."
+    )
+
+
+def bankroll_lens_text(result, selected_tier, bankroll_amount=None, bet_size=None):
+    ctx = bankroll_context(result, selected_tier, bankroll_amount, bet_size)
+    if ctx is None:
+        return None
+
+    if not ctx["has_bankroll_inputs"]:
+        return (
+            f"This is a {ctx['pressure']} spot with the recommended action at {ctx['best_ev']:+.3f} units per original bet. "
+            f"{ctx['margin_text']} Add bankroll and bet size to see whether the stake is conservative, balanced, or too aggressive. "
+            "That extra layer is what turns a correct move into a usable bankroll plan."
+        )
+
+    return (
+        f"With a bankroll of ${ctx['bankroll_amount']:,.2f} and a ${ctx['bet_size']:,.2f} stake, you are risking "
+        f"{ctx['bet_fraction'] * 100:.2f}% of bankroll on this hand, which is {ctx['stake_note']}. "
+        f"{ctx['margin_text']} A disciplined unit for this bankroll is roughly ${ctx['conservative_unit']:,.2f} to "
+        f"${ctx['assertive_unit']:,.2f}, so this bet should be judged against that range. "
+        f"If the unit size drifts too far above that range, even correct decisions become harder to monetize over time."
+    )
+
+
+def bankroll_guidance(result, selected_tier, bankroll_amount=None, bet_size=None):
+    ctx = bankroll_context(result, selected_tier, bankroll_amount, bet_size)
+    if ctx is None:
+        return None
+
+    if not ctx["has_bankroll_inputs"]:
+        return (
+            f"Bankroll Desk view: this is a {ctx['pressure']} spot, and the selected action is worth {ctx['best_ev']:+.3f} units per original bet. "
+            f"{ctx['margin_text']}\n\n"
+            "To make this analysis useful in real bankroll terms, enter the bankroll amount and current bet size. "
+            "That unlocks guidance on how aggressive the stake is, what a reasonable unit size looks like, and how to stay solvent long enough for an edge to matter."
+        )
+
+    return (
+        f"With a bankroll of ${ctx['bankroll_amount']:,.2f} and a live bet of ${ctx['bet_size']:,.2f}, you are risking "
+        f"{ctx['bet_fraction'] * 100:.2f}% of bankroll on this hand, which is {ctx['stake_note']}. The selected action is {ctx['action']} at "
+        f"{ctx['best_ev']:+.3f} units per original bet. {ctx['margin_text']} A disciplined unit for this bankroll is roughly "
+        f"${ctx['conservative_unit']:,.2f} to ${ctx['assertive_unit']:,.2f} per hand, so this wager should be judged against that range.\n\n"
+        f"{ctx['long_run_note']} To turn a profit in the long run, the player needs two things working together: a real edge in the decision "
+        "and a bet size small enough that variance does not knock the bankroll out before the edge has time to compound. "
+        "Bankroll discipline is what lets mathematical edge survive long enough to show up in actual results."
     )
 
 
@@ -871,6 +1011,27 @@ with left_col:
         placeholder="Optional, comma-separated",
     )
 
+    bankroll_amount = None
+    bet_size = None
+    if selected_tier["level"] == "elite":
+        bankroll_col1, bankroll_col2 = st.columns(2)
+        with bankroll_col1:
+            bankroll_amount = st.number_input(
+                "Bankroll ($)",
+                min_value=1.0,
+                value=1000.0,
+                step=50.0,
+                help="Total bankroll available for this session or bankroll plan.",
+            )
+        with bankroll_col2:
+            bet_size = st.number_input(
+                "Current Bet ($)",
+                min_value=1.0,
+                value=25.0,
+                step=5.0,
+                help="Current amount at risk on this hand before doubles or splits.",
+            )
+
     analyze_button = st.button("Analyze Hand")
 
 with right_col:
@@ -924,7 +1085,7 @@ if analyze_button:
         if selected_tier["level"] == "free":
             coach_text = explanation
         elif explanation_mode == "Bankroll Desk":
-            coach_text = bankroll_guidance(result, selected_tier)
+            coach_text = bankroll_coach_call(result, selected_tier, bankroll_amount, bet_size)
 
         hand_type_parts = []
         if result["hand_info"]["is_soft"]:
@@ -985,7 +1146,10 @@ if analyze_button:
                 render_insight_card("Common mistake", coach.get("common_mistake", explanation))
         with insight_col3:
             if selected_tier["level"] == "elite":
-                render_insight_card("Bankroll lens", bankroll_guidance(result, selected_tier))
+                render_insight_card(
+                    "Bankroll lens",
+                    bankroll_lens_text(result, selected_tier, bankroll_amount, bet_size),
+                )
             else:
                 render_insight_card("Teaching tip", coach.get("teaching_tip", explanation))
 
@@ -1008,7 +1172,7 @@ if analyze_button:
             render_panel(
                 "Bankroll Desk View",
                 "Risk-aware decision framing",
-                bankroll_guidance(result, selected_tier),
+                bankroll_guidance(result, selected_tier, bankroll_amount, bet_size),
                 strong=True,
             )
 
@@ -1088,5 +1252,3 @@ with footer_col2:
             "Player: A,7 | Dealer: 9\n"
             "Player: 5,5 | Dealer: 6"
         )
-
-
