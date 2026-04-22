@@ -12,19 +12,7 @@
 # - blackjack_engine.py
 # - model.py
 # - out/best_model.pt
-# - out/meta.json# app.py
-# Streamlit MVP app for the Blackjack AI Coach
-#
-# This app connects:
-# - blackjack_engine.py for the recommendation
-# - optional nanoGPT model output for explanation text
-#
-# To run:
-#   streamlit run app.py
-#
-# Optional files used:
-# - blackjack_engine.py
-# - model.py# app.py
+# - out/meta.json# app.py# app.py
 # Streamlit MVP app for the Blackjack AI Coach
 #
 # This app connects:
@@ -138,23 +126,6 @@ st.markdown(
         color: #f7f2ea !important;
     }
 
-    [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] div,
-    [data-testid="stSidebar"] li,
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
-    [data-testid="stSidebar"] [data-testid="stWidgetLabel"],
-    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] *,
-    [data-testid="stSidebar"] [role="radiogroup"] *,
-    [data-testid="stSidebar"] [role="checkbox"] *,
-    [data-testid="stSidebar"] .stCheckbox *,
-    [data-testid="stSidebar"] .stRadio * {
-        color: #fff8ef !important;
-        -webkit-text-fill-color: #fff8ef !important;
-    }
-
     [data-testid="stSidebar"] .stCodeBlock {
         background: rgba(255, 255, 255, 0.08);
         border-radius: 14px;
@@ -258,14 +229,6 @@ st.markdown(
             linear-gradient(135deg, rgba(17, 63, 48, 0.98), rgba(29, 107, 79, 0.95));
         color: #fbf6ef;
         border: 1px solid rgba(17, 63, 48, 0.10);
-    }
-
-    .coach-call,
-    .coach-call *,
-    .coach-call-label,
-    .coach-call-text {
-        color: #fff8ef !important;
-        -webkit-text-fill-color: #fff8ef !important;
     }
 
     .coach-call-label {
@@ -405,18 +368,10 @@ st.markdown(
         border-radius: 18px;
         border: 0;
         background: linear-gradient(135deg, #173f31, #226b4f);
-        color: #fff9f1 !important;
-        -webkit-text-fill-color: #fff9f1 !important;
+        color: #fff9f1;
         font-weight: 700;
         min-height: 3.2rem;
         box-shadow: 0 12px 30px rgba(17, 63, 48, 0.22);
-    }
-
-    .stButton > button *,
-    .stButton > button span,
-    .stButton > button div {
-        color: #fff9f1 !important;
-        -webkit-text-fill-color: #fff9f1 !important;
     }
 
     .stButton > button:hover {
@@ -436,21 +391,9 @@ st.markdown(
     }
 
     .stSelectbox [data-baseweb="select"] span,
-    .stSelectbox [data-baseweb="select"] div,
-    .stSelectbox [data-baseweb="select"] input,
     .stSelectbox [data-baseweb="select"] svg {
         color: #fff8ef !important;
-        -webkit-text-fill-color: #fff8ef !important;
         fill: #fff8ef !important;
-    }
-
-    .stNumberInput input,
-    .stNumberInput button,
-    .stNumberInput button *,
-    .stNumberInput [data-baseweb="input"] input,
-    .stNumberInput [data-baseweb="input"] div {
-        color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important;
     }
 
     div[data-baseweb="popover"] div[role="listbox"] {
@@ -609,7 +552,7 @@ PLAN_TIERS = {
         "price": "Free",
         "model": "Classical Coach Model",
         "level": "free",
-        "copy": "Our most simple model that gives simple and practical advice.",
+        "copy": "Clean recommendations and plain-English hand lessons for practice sessions.",
     },
     "EV Edge - $19 / month": {
         "kicker": "Pro",
@@ -1001,6 +944,11 @@ explanation_mode = st.sidebar.radio(
 )
 use_gpt = st.sidebar.checkbox("Use trained nanoGPT explanation if available", value=True)
 
+st.sidebar.markdown("---")
+st.sidebar.write("Recommended training checkpoint paths:")
+st.sidebar.code("out/best_model.pt\nout/meta.json")
+
+
 # --------------------------------------------------
 # Intro panels
 # --------------------------------------------------
@@ -1289,10 +1237,18 @@ with footer_col2:
             "Player: 5,5 | Dealer: 6"
         )
 
-# - out/best_model.pt
-# - out/meta.json
-
-# app.py
+# Streamlit MVP app for the Blackjack AI Coach
+#
+# This app connects:
+# - blackjack_engine.py for the recommendation
+# - optional nanoGPT model output for explanation text
+#
+# To run:
+#   streamlit run app.py
+#
+# Optional files used:
+# - blackjack_engine.py
+# - model.py# app.py
 # Streamlit MVP app for the Blackjack AI Coach
 #
 # This app connects:
