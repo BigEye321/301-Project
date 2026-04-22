@@ -1,3 +1,4 @@
+[PRESENTATION_GUIDE.md](https://github.com/user-attachments/files/26954214/PRESENTATION_GUIDE.md)
 # Blackjack AI Coach MVP Presentation Guide
 
 ## Demo Name
@@ -11,6 +12,26 @@ Tagline:
 One-sentence pitch:
 
 Blackjack AI Coach is a Streamlit MVP that gives blackjack training recommendations, compares long-run expected value for legal moves, and turns the result into coaching language a player can remember next time.
+
+## Streamlit Cloud Deploy
+
+After uploading the current `mvp/` folder to GitHub, deploy with:
+
+```text
+Main file path: mvp/app.py
+```
+
+The app depends on:
+
+```text
+mvp/requirements.txt
+```
+
+The Streamlit config file is:
+
+```text
+mvp/.streamlit/config.toml
+```
 
 ## What To Show
 
@@ -111,6 +132,7 @@ Output:
 - Plain-English coaching
 - Strategic pattern to remember
 - Upgrade preview instead of full EV table
+- Coach mode syncs to the free tier language
 
 ### EV Edge - $19 / month
 
@@ -127,6 +149,7 @@ Output:
 - EV margin
 - Action-by-action EV comparison
 - Long-run financial explanation
+- Coach mode syncs to EV Edge automatically
 
 ### Bankroll Desk - $39 / month
 
@@ -139,9 +162,11 @@ Bankroll-Aware EV Model
 Output:
 
 - Everything in EV Edge
-- Bankroll/risk framing
-- Risk-aware hand classification
-- Discipline-focused guidance
+- Bankroll and current bet inputs
+- Short bankroll-aware coach call
+- Medium-length bankroll lens
+- Full 1-2 paragraph bankroll desk analysis
+- Coach mode syncs to Bankroll Desk automatically
 
 ## Recommended Demo Script
 
@@ -256,4 +281,3 @@ When running locally:
 ```text
 http://127.0.0.1:8501
 ```
-
