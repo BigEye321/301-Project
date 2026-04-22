@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/26954232/README.md)
 # Blackjack AI Coach MVP
 
 This folder contains the completed MVP deliverable for Project 301.
@@ -27,6 +28,35 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+Open:
+
+```text
+http://127.0.0.1:8501
+```
+
+## Deploy On Streamlit Community Cloud
+
+1. Push the current `mvp/` folder to GitHub.
+2. In Streamlit Community Cloud, choose:
+
+```text
+Repository: your GitHub repo
+Branch: main
+Main file path: mvp/app.py
+```
+
+3. Streamlit will install from:
+
+```text
+mvp/requirements.txt
+```
+
+The local config file used for Streamlit lives at:
+
+```text
+mvp/.streamlit/config.toml
+```
+
 ## Train Model
 
 ```bash
@@ -48,4 +78,3 @@ python sample.py
 - [x] Demo entrypoint included
 - [x] `README.md` completed
 - [x] `report.md` completed
-
