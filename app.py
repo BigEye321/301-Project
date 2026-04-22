@@ -28,6 +28,22 @@
 # - out/best_model.pt
 # - out/meta.json
 
+# app.py
+# Streamlit MVP app for the Blackjack AI Coach
+#
+# This app connects:
+# - blackjack_engine.py for the recommendation
+# - optional nanoGPT model output for explanation text
+#
+# To run:
+#   streamlit run app.py
+#
+# Optional files used:
+# - blackjack_engine.py
+# - model.py
+# - out/best_model.pt
+# - out/meta.json
+
 import html
 import json
 from pathlib import Path
@@ -1236,31 +1252,3 @@ with footer_col2:
             "Player: A,7 | Dealer: 9\n"
             "Player: 5,5 | Dealer: 6"
         )
-
-# Streamlit MVP app for the Blackjack AI Coach
-#
-# This app connects:
-# - blackjack_engine.py for the recommendation
-# - optional nanoGPT model output for explanation text
-#
-# To run:
-#   streamlit run app.py
-#
-# Optional files used:
-# - blackjack_engine.py
-# - model.py# app.py
-# Streamlit MVP app for the Blackjack AI Coach
-#
-# This app connects:
-# - blackjack_engine.py for the recommendation
-# - optional nanoGPT model output for explanation text
-#
-# To run:
-#   streamlit run app.py
-#
-# Optional files used:
-# - blackjack_engine.py
-# - model.py
-# - out/best_model.pt
-# - out/meta.json
-
