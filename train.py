@@ -1,4 +1,3 @@
-
 # train.py
 # Training script for the nanoGPT-style blackjack explanation model
 #

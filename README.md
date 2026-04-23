@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/26954232/README.md)
 # Blackjack AI Coach MVP
 
 This folder contains the completed MVP deliverable for Project 301.
@@ -15,6 +14,7 @@ This folder contains the completed MVP deliverable for Project 301.
 | `sample.py` | Inference script |
 | `requirements.txt` | Python dependencies |
 | `report.md` | Project report |
+| `SYSTEM_DESIGN.md` | High-level architecture and data flow diagram |
 
 ## Setup
 

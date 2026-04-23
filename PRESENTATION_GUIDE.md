@@ -1,4 +1,3 @@
-[PRESENTATION_GUIDE.md](https://github.com/user-attachments/files/26954214/PRESENTATION_GUIDE.md)
 # Blackjack AI Coach MVP Presentation Guide
 
 ## Demo Name
