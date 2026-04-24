@@ -712,6 +712,25 @@ def render_json_block(payload):
     render_copy_block(json.dumps(payload, indent=2))
 
 
+@st.cache_data(show_spinner=False)
+def analyze_hand_cached(
+    player_cards,
+    dealer_card,
+    can_double,
+    can_split,
+    dealer_hits_soft_17,
+    deck_count,
+):
+    return recommend_action(
+        player_cards=list(player_cards),
+        dealer_card=dealer_card,
+        can_double=can_double,
+        can_split=can_split,
+        dealer_hits_soft_17=dealer_hits_soft_17,
+        deck_count=deck_count,
+    )
+
+
 def bankroll_context(result, selected_tier, bankroll_amount=None, bet_size=None):
     action = result["recommended_action"]
     best_ev = result.get("best_ev")
@@ -899,6 +918,7 @@ def render_hero():
     )
 
 
+@st.cache_resource(show_spinner=False)
 def load_gpt_model(checkpoint_path=SCRIPT_DIR / "out" / "best_model.pt", meta_path=SCRIPT_DIR / "out" / "meta.json"):
     """
     Load trained nanoGPT model and tokenizer metadata.
@@ -973,15 +993,100 @@ def load_training_lines():
     return train_file.read_text(encoding="utf-8").splitlines()
 
 
+@st.cache_data(show_spinner=False)
+def load_training_lookup():
+    lines = load_training_lines()
+    exact_map = {}
+    strict_hand_map = {}
+    curated_map = {}
+    for line in lines:
+        if " | Tier: " not in line:
+            continue
+
+        try:
+            tier_part = line.split(" | Tier: ", 1)[1]
+            tier_name, rest = tier_part.split(" | Voice: ", 1)
+            voice, rest = rest.split(" | ", 1)
+            response_label, response_text = rest.split(": ", 1)
+        except ValueError:
+            continue
+
+        exact_key = (
+            line.split(f" | Tier: {tier_name} | Voice: {voice} | {response_label}:", 1)[0],
+            tier_name,
+            voice,
+            response_label,
+        )
+        exact_map.setdefault(exact_key, response_text)
+
+        hand_prefix = exact_key[0]
+        if " | Action: " in hand_prefix:
+            strict_hand_prefix = hand_prefix.split(" | Action: ", 1)[0] + " | "
+            strict_hand_map.setdefault(
+                (strict_hand_prefix, tier_name, voice, response_label),
+                response_text,
+            )
+
+        if " | Total: " not in line:
+            curated_prefix = (
+                line.split(f" | Tier: {tier_name} | Voice: {voice} | {response_label}:", 1)[0]
+                + f" | Tier: {tier_name} | Voice: {voice} | {response_label}:"
+            )
+            curated_map.setdefault(curated_prefix, response_text)
+
+    return exact_map, strict_hand_map, curated_map
+
+
 def retrieve_grounded_gpt_response(prompt):
     """
     Returns an exact training response when the current hand/tier prompt exists.
     This keeps the nanoGPT layer grounded on the actual input instead of drifting.
     """
-    for line in load_training_lines():
-        if line.startswith(prompt):
-            return line[len(prompt):].strip()
-    return None
+    exact_map, _, _ = load_training_lookup()
+    if " | Tier: " not in prompt:
+        return None
+    try:
+        tier_part = prompt.split(" | Tier: ", 1)[1]
+        tier_name, rest = tier_part.split(" | Voice: ", 1)
+        voice, rest = rest.split(" | ", 1)
+        response_label = rest[:-1] if rest.endswith(":") else rest
+    except ValueError:
+        return None
+    prompt_prefix = prompt.split(f" | Tier: {tier_name} | Voice: {voice} | {response_label}:", 1)[0]
+    return exact_map.get((prompt_prefix, tier_name, voice, response_label))
+
+
+def build_retrieval_prefix(result):
+    state = result["state"]
+    hand = result["hand_info"]
+    return (
+        f"Player: {','.join(state['player_cards'])} | "
+        f"Dealer: {state['dealer_card']} | "
+        f"Total: {hand['total']} | "
+        f"Soft: {hand['is_soft']} | "
+        f"Pair: {hand['is_pair']} | "
+        f"Double Allowed: {state['can_double']} | "
+        f"Split Allowed: {state['can_split']} | "
+        f"Dealer Hits Soft 17: {state['dealer_hits_soft_17']} | "
+        f"Deck Count: {state['deck_count']} | "
+    )
+
+
+def retrieve_grounded_gpt_response_for_hand(result, selected_tier, explanation_mode):
+    voice = GPT_VOICES[explanation_mode]
+    response_label = tier_response_label(selected_tier)
+    tier_name = selected_tier["name"]
+    strict_prefix = build_retrieval_prefix(result)
+    curated_prefix = (
+        f"Player: {','.join(result['state']['player_cards'])} | "
+        f"Dealer: {result['state']['dealer_card']} | "
+        f"Tier: {tier_name} | Voice: {voice} | {response_label}:"
+    )
+
+    _, strict_hand_map, curated_map = load_training_lookup()
+    return strict_hand_map.get((strict_prefix, tier_name, voice, response_label)) or curated_map.get(
+        curated_prefix
+    )
 
 
 def extract_reason_only(generated_text):
@@ -1072,6 +1177,11 @@ explanation_mode = st.sidebar.radio(
 )
 use_gpt = st.sidebar.checkbox("Use trained nanoGPT for explanation only", value=True)
 st.sidebar.caption("The language model can rewrite the explanation, but it does not choose the move.")
+allow_generation_fallback = st.sidebar.checkbox(
+    "Allow experimental generation fallback",
+    value=False,
+    help="If off, the app only shows grounded nanoGPT responses that match known training examples.",
+)
 
 # --------------------------------------------------
 # Intro panels
@@ -1174,13 +1284,13 @@ if analyze_button:
             extras = [c.strip().upper() for c in additional_cards_input.split(",") if c.strip()]
             player_cards.extend(extras)
 
-        result = recommend_action(
-            player_cards=player_cards,
-            dealer_card=dealer_card,
-            can_double=can_double,
-            can_split=can_split,
-            dealer_hits_soft_17=dealer_hits_soft_17,
-            deck_count=2,
+        result = analyze_hand_cached(
+            tuple(player_cards),
+            dealer_card,
+            can_double,
+            can_split,
+            dealer_hits_soft_17,
+            2,
         )
 
         action = result["recommended_action"]
@@ -1309,20 +1419,26 @@ if analyze_button:
         )
 
         if use_gpt:
-            grounded_response = retrieve_grounded_gpt_response(gpt_prompt)
-            gpt_output = grounded_response or generate_gpt_explanation(
-                prompt=gpt_prompt,
-                max_new_tokens=120,
-                temperature=0.45,
-                top_k=20,
-            )
+            grounded_response = retrieve_grounded_gpt_response_for_hand(
+                result,
+                selected_tier,
+                explanation_mode,
+            ) or retrieve_grounded_gpt_response(gpt_prompt)
+            gpt_output = grounded_response
+            if gpt_output is None and allow_generation_fallback:
+                gpt_output = generate_gpt_explanation(
+                    prompt=gpt_prompt,
+                    max_new_tokens=120,
+                    temperature=0.45,
+                    top_k=20,
+                )
             gpt_reason = extract_reason_only(gpt_output)
 
             if gpt_output is None:
                 render_panel(
                     "nanoGPT Coach Voice",
-                    "Model output unavailable",
-                    "No trained nanoGPT checkpoint was found, or the prompt contains characters outside the tokenizer. The EV engine still chooses the move, and the built-in coach explanation remains active.",
+                    "Grounded response unavailable",
+                    "This hand is not yet covered by the grounded nanoGPT training set. The EV engine still chooses the move, and the built-in coach explanation remains active.",
                 )
             elif not readable_gpt_text(gpt_reason):
                 fallback_text = coach_text or explanation
