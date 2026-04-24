@@ -918,6 +918,34 @@ def render_hero():
     )
 
 
+def engine_tier_fallback(result, tier_name):
+    coach = result.get("coach", {})
+    action = result["recommended_action"]
+    best_ev = result.get("best_ev")
+    ev_margin = result.get("ev_margin")
+    explanation = result["explanation"]
+    math_reason = coach.get("math") or coach.get("decision_summary") or explanation
+    decision_summary = coach.get("decision_summary") or explanation
+    teaching_tip = coach.get("teaching_tip") or explanation
+
+    best_ev_text = "N/A" if best_ev is None else f"{best_ev:+.3f}"
+    margin_text = "N/A" if ev_margin is None else f"{ev_margin:+.3f}"
+
+    if tier_name == "Table Coach":
+        return f"{action} is the clean table play here. {decision_summary} {teaching_tip}"
+
+    if tier_name == "EV Edge":
+        return (
+            f"Expected value view: {action} leads the board at {best_ev_text} units. "
+            f"The separation from the runner-up is {margin_text} units. {math_reason}"
+        )
+
+    return (
+        f"Bankroll lens: {action} is the correct line. The hand is worth {best_ev_text} units per original bet, "
+        "so the edge only matters if the stake stays disciplined and the bankroll can absorb variance."
+    )
+
+
 @st.cache_resource(show_spinner=False)
 def load_gpt_model(checkpoint_path=SCRIPT_DIR / "out" / "best_model.pt", meta_path=SCRIPT_DIR / "out" / "meta.json"):
     """
@@ -1433,14 +1461,16 @@ if analyze_button:
                     top_k=20,
                 )
             gpt_reason = extract_reason_only(gpt_output)
+            grounded_match = grounded_response is not None
 
             if gpt_output is None:
+                fallback_tier_text = engine_tier_fallback(result, selected_tier["name"])
                 render_panel(
                     "nanoGPT Coach Voice",
-                    "Grounded response unavailable",
-                    "This hand is not yet covered by the grounded nanoGPT training set. The EV engine still chooses the move, and the built-in coach explanation remains active.",
+                    "Engine-backed tier response",
+                    fallback_tier_text,
                 )
-            elif not readable_gpt_text(gpt_reason):
+            elif not grounded_match and not readable_gpt_text(gpt_reason):
                 fallback_text = coach_text or explanation
                 render_panel(
                     "nanoGPT Coach Voice",
@@ -1450,7 +1480,7 @@ if analyze_button:
             else:
                 source_title = (
                     "Retrieval-grounded language layer"
-                    if grounded_response
+                    if grounded_match
                     else "Explanation-only language layer"
                 )
                 render_panel(
